@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pan de Jamón - Control de Pedidos e Inventario</title>
+  <style>
+    :root {
+      --primary: #2d6a4f;
+      --primary-dark: #1b4332;
+      --secondary: #d97706;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --danger: #ef4444;
+      --success: #10b981;
+      --whatsapp: #25d366;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 80px; }
+
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: sticky; top: 0; z-index: 100;
+    }
+
+    .header-title h1 { font-size: 1.2rem; font-weight: 700; }
+    .header-title p { font-size: 0.75rem; opacity: 0.9; }
+
+    .btn {
+      padding: 0.5rem 0.8rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; font-size: 0.85rem;
+    }
+    .btn-primary { background: var(--secondary); color: white; }
+    .btn-secondary { background: #e2e8f0; color: var(--text); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-whatsapp { background: var(--whatsapp); color: white; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+
+    .nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab-btn { flex: 1; padding: 0.6rem; border: none; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #64748b; cursor: pointer; }
+    .tab-btn.active { background: var(--primary); color: white; }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 1rem; }
+
+    .card {
+      background: var(--card-bg); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+      border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+    .stat-card { border-left: 4px solid var(--primary); }
+    .stat-card.usd { border-left-color: #10b981; }
+    .stat-card.ves { border-left-color: #3b82f6; }
+    .stat-card.cop { border-left-color: #f59e0b; }
+    .stat-title { font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .stat-values { display: flex; justify-content: space-between; margin-top: 0.4rem; }
+    .stat-val { font-size: 1rem; font-weight: 700; }
+    .stat-val.collected { color: var(--success); }
+    .stat-val.pending { color: var(--danger); }
+
+    .products-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .prod-badge { background: #f1f5f9; padding: 0.5rem; border-radius: 8px; text-align: center; }
+    .prod-badge .num { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+    .prod-badge .label { font-size: 0.75rem; color: #64748b; }
+
+    .order-item { border-bottom: 1px solid var(--border); padding: 0.8rem 0; }
+    .order-item:last-child { border-bottom: none; }
+    .order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem; }
+    .client-name { font-weight: 700; font-size: 0.95rem; }
+    .order-status { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 12px; font-weight: 600; }
+    .status-pagado { background: #dcfce7; color: #15803d; }
+    .status-pendiente { background: #fee2e2; color: #b91c1c; }
+    .status-abono { background: #fef3c7; color: #b45309; }
+
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.2rem; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+
+    .form-group { margin-bottom: 0.8rem; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .form-control { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+    .caja-items-box { background: #fefce8; border: 1px solid #fef08a; padding: 0.8rem; border-radius: 8px; margin-top: 0.5rem; }
+    
+    .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.8rem; }
+    .inv-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; text-align: center; }
+    .inv-qty { font-size: 1.4rem; font-weight: 800; color: var(--primary); margin: 0.3rem 0; }
+
+    #auth-screen, #config-screen { display: none; }
+    .auth-box { max-width: 400px; margin: 2rem auto; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  </style>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    let auth, db, unsubscribeOrders, unsubscribeInventory;
+
+    // Funciones de formateo de moneda personalizadas
+    function formatMoney(amount, currency) {
+      const val = parseFloat(amount) || 0;
+      if (currency === 'USD') {
+        return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else if (currency === 'VES') {
+        return `Bs. ${val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else if (currency === 'COP') {
+        return `$${val.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`;
+      }
+      return `${val} ${currency}`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedConfig = localStorage.getItem('panes_firebase_config');
+      if (!savedConfig) {
+        document.getElementById('config-screen').style.display = 'block';
+      } else {
+        initFirebase(JSON.parse(savedConfig));
+      }
+    });
+
+    window.saveConfig = function() {
+      const config = {
+        apiKey: document.getElementById('cfg-apiKey').value.trim(),
+        authDomain: document.getElementById('cfg-authDomain').value.trim(),
+        projectId: document.getElementById('cfg-projectId').value.trim(),
+        storageBucket: document.getElementById('cfg-storageBucket').value.trim(),
+        messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
+        appId: document.getElementById('cfg-appId').value.trim()
+      };
+
+      if (!config.apiKey || !config.projectId) {
+        alert("Por favor completa las claves requeridas.");
+        return;
+      }
+
+      localStorage.setItem('panes_firebase_config', JSON.stringify(config));
+      location.reload();
+    };
+
+    window.resetConfig = function() {
+      if (confirm("¿Deseas cambiar las claves de Firebase?")) {
+        localStorage.removeItem('panes_firebase_config');
+        location.reload();
+      }
+    };
+
+    function initFirebase(config) {
+      try {
+        const app = initializeApp(config);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            document.getElementById('user-email').innerText = user.email;
+            loadOrders();
+            loadInventory();
+          } else {
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('auth-screen').style.display = 'block';
+          }
+        });
+      } catch (err) {
+        alert("Error de conexión a Firebase: " + err.message);
+        document.getElementById('config-screen').style.display = 'block';
+      }
+    }
+
+    window.login = async function() {
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-pass').value;
+      const errEl = document.getElementById('login-error');
+      errEl.innerText = "";
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (err) {
+        errEl.innerText = "Error: Credenciales incorrectas o problema de acceso.";
+      }
+    };
+
+    window.logout = function() {
+      signOut(auth);
+    };
+
+    window.switchTab = function(tab) {
+      if (tab === 'pedidos') {
+        document.getElementById('sec-pedidos').style.display = 'block';
+        document.getElementById('sec-inventario').style.display = 'none';
+        document.getElementById('tab-pedidos').classList.add('active');
+        document.getElementById('tab-inventario').classList.remove('active');
+      } else {
+        document.getElementById('sec-pedidos').style.display = 'none';
+        document.getElementById('sec-inventario').style.display = 'block';
+        document.getElementById('tab-pedidos').classList.remove('active');
+        document.getElementById('tab-inventario').classList.add('active');
+      }
+    };
+
+    function loadOrders() {
+      const q = query(collection(db, "pedidos"), orderBy("createdAt", "desc"));
+      unsubscribeOrders = onSnapshot(q, (snapshot) => {
+        const orders = [];
+        snapshot.forEach((doc) => {
+          orders.push({ id: doc.id, ...doc.data() });
+        });
+        renderOrders(orders);
+      });
+    }
+
+    function renderOrders(orders) {
+      const listEl = document.getElementById('orders-list');
+      listEl.innerHTML = "";
+
+      let totals = {
+        USD: { cobrado: 0, porCobrar: 0 },
+        VES: { cobrado: 0, porCobrar: 0 },
+        COP: { cobrado: 0, porCobrar: 0 }
+      };
+
+      let prods = { tradicional: 0, especial: 0, medio: 0, cajas: 0 };
+
+      orders.forEach(o => {
+        const curr = o.currency || 'USD';
+        const total = parseFloat(o.totalPrice) || 0;
+        const paid = parseFloat(o.paidAmount) || 0;
+        const pending = Math.max(0, total - paid);
+
+        if (totals[curr]) {
+          totals[curr].cobrado += paid;
+          totals[curr].porCobrar += pending;
+        }
+
+        prods.tradicional += parseInt(o.qtyTradicional) || 0;
+        prods.especial += parseInt(o.qtyEspecial) || 0;
+        prods.medio += parseInt(o.qtyMedio) || 0;
+        prods.cajas += parseInt(o.qtyCajas) || 0;
+
+        let statusClass = 'status-pendiente';
+        let statusText = 'Pendiente';
+        if (pending <= 0) {
+          statusClass = 'status-pagado';
+          statusText = 'Pagado';
+        } else if (paid > 0) {
+          statusClass = 'status-abono';
+          statusText = 'Abonado';
+        }
+
+        let prodSummaryText = [];
+        if (o.qtyTradicional > 0) prodSummaryText.push(`🥖 Trad: ${o.qtyTradicional}`);
+        if (o.qtyEspecial > 0) prodSummaryText.push(`⭐ Esp: ${o.qtyEspecial}`);
+        if (o.qtyMedio > 0) prodSummaryText.push(`🥖 ½ Pan: ${o.qtyMedio}`);
+        if (o.qtyCajas > 0) prodSummaryText.push(`🎁 Cajas: ${o.qtyCajas}`);
+
+        let cajaDetailStr = "";
+        if (o.qtyCajas > 0 && o.cajaContent) {
+          let parts = [];
+          if (o.cajaContent.miniPan > 0) parts.push(`${o.cajaContent.miniPan} Mini Pan`);
+          if (o.cajaContent.ponche > 0) parts.push(`${o.cajaContent.ponche} Ponche`);
+          if (o.cajaContent.torta > 0) parts.push(`${o.cajaContent.torta} Torta Negra`);
+          if (o.cajaContent.galletas > 0) parts.push(`${o.cajaContent.galletas} Galletas`);
+          if (parts.length > 0) cajaDetailStr = `🎁 <i>Contenido Caja: ${parts.join(', ')}</i>`;
+        }
+
+        const formattedTotal = formatMoney(total, curr);
+        const formattedPaid = formatMoney(paid, curr);
+
+        const itemHtml = `
+          <div class="order-item">
+            <div class="order-header">
+              <div>
+                <span class="client-name">${o.clientName}</span>
+                <div style="font-size:0.75rem; color:#64748b;">📞 ${o.phone || 'Sin telf'} | 📅 ${o.deliveryDate || 'Sin fecha'}</div>
+              </div>
+              <span class="order-status ${statusClass}">${statusText}</span>
+            </div>
+            <div style="font-size:0.8rem; margin:0.2rem 0; font-weight:600; color:#2d6a4f;">
+              ${prodSummaryText.join(' | ')}
+            </div>
+            ${cajaDetailStr ? `<div style="font-size:0.75rem; color:#854d0e; background:#fef9c3; padding:0.2rem 0.4rem; border-radius:4px; margin:0.2rem 0;">${cajaDetailStr}</div>` : ''}
+            ${o.notes ? `<div style="font-size:0.75rem; color:#d97706; background:#fffbeb; padding:0.2rem 0.4rem; border-radius:4px; margin:0.2rem 0;">📝 <b>Obs:</b> ${o.notes}</div>` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-top:0.4rem;">
+              <div>Total: <b>${formattedTotal}</b> | Abono: <span style="color:#10b981;">${formattedPaid}</span></div>
+              <div style="display:flex; gap:0.3rem;">
+                ${o.phone ? `<button class="btn btn-whatsapp btn-sm" onclick="sendWhatsApp('${o.phone}', '${o.clientName}', '${formattedTotal}', '${formattedPaid}', '${o.deliveryDate}')">💬</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="editOrder('${o.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `;
+        listEl.innerHTML += itemHtml;
+      });
+
+      document.getElementById('usd-collected').innerText = formatMoney(totals.USD.cobrado, 'USD');
+      document.getElementById('usd-pending').innerText = formatMoney(totals.USD.porCobrar, 'USD');
+      document.getElementById('ves-collected').innerText = formatMoney(totals.VES.cobrado, 'VES');
+      document.getElementById('ves-pending').innerText = formatMoney(totals.VES.porCobrar, 'VES');
+      document.getElementById('cop-collected').innerText = formatMoney(totals.COP.cobrado, 'COP');
+      document.getElementById('cop-pending').innerText = formatMoney(totals.COP.porCobrar, 'COP');
+
+      document.getElementById('cnt-tradicional').innerText = prods.tradicional;
+      document.getElementById('cnt-especial').innerText = prods.especial;
+      document.getElementById('cnt-medio').innerText = prods.medio;
+      document.getElementById('cnt-cajas').innerText = prods.cajas;
+
+      window.allOrdersCache = orders;
+    }
+
+    function loadInventory() {
+      const q = collection(db, "inventario");
+      unsubscribeInventory = onSnapshot(q, (snapshot) => {
+        let items = [];
+        snapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() });
+        });
+
+        if (items.length === 0) {
+          initDefaultInventory();
+          return;
+        }
+
+        renderInventory(items);
+      });
+    }
+
+    async function initDefaultInventory() {
+      const defaults = [
+        { name: 'Pasas', qty: 0, unit: 'kg' },
+        { name: 'Aceitunas', qty: 0, unit: 'kg' },
+        { name: 'Jamón', qty: 0, unit: 'kg' },
+        { name: 'Tocineta', qty: 0, unit: 'kg' },
+        { name: 'Cajas', qty: 0, unit: 'unid' }
+      ];
+      for (let item of defaults) {
+        await addDoc(collection(db, "inventario"), item);
+      }
+    }
+
+    function renderInventory(items) {
+      const grid = document.getElementById('inventory-list');
+      grid.innerHTML = "";
+
+      items.forEach(item => {
+        const html = `
+          <div class="inv-card">
+            <div style="font-weight:700; font-size:0.9rem;">${item.name}</div>
+            <div class="inv-qty">${item.qty} <span style="font-size:0.8rem; font-weight:normal;">${item.unit || ''}</span></div>
+            <div style="display:flex; justify-content:center; gap:0.3rem;">
+              <button class="btn btn-secondary btn-sm" onclick="updateStock('${item.id}', ${item.qty - 1})">-</button>
+              <button class="btn btn-secondary btn-sm" onclick="updateStock('${item.id}', ${item.qty + 1})">+</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteInvItem('${item.id}')">🗑️</button>
+            </div>
+          </div>
+        `;
+        grid.innerHTML += html;
+      });
+    }
+
+    window.updateStock = async function(id, newQty) {
+      if (newQty < 0) newQty = 0;
+      try {
+        await updateDoc(doc(db, "inventario", id), { qty: newQty });
+      } catch (e) {
+        alert("Error al actualizar inventario: " + e.message);
+      }
+    };
+
+    window.deleteInvItem = async function(id) {
+      if (confirm("¿Eliminar este producto del inventario?")) {
+        await deleteDoc(doc(db, "inventario", id));
+      }
+    };
+
+    window.addInventoryItem = async function() {
+      const name = prompt("Nombre del nuevo producto/ingrediente:");
+      if (!name) return;
+      const qtyStr = prompt("Cantidad inicial:", "0");
+      const unit = prompt("Unidad de medida (ej: kg, unid, lt):", "unid");
+
+      await addDoc(collection(db, "inventario"), {
+        name: name.trim(),
+        qty: parseFloat(qtyStr) || 0,
+        unit: unit.trim()
+      });
+    };
+
+    window.toggleCajaSelection = function() {
+      const qtyCajas = parseInt(document.getElementById('f-cajas').value) || 0;
+      const box = document.getElementById('caja-selection-box');
+      if (qtyCajas > 0) {
+        box.style.display = 'block';
+      } else {
+        box.style.display = 'none';
+      }
+    };
+
+    window.sendWhatsApp = function(phone, name, formattedTotal, formattedPaid, date) {
+      const msg = `¡Hola ${name}! 🎄 Te escribimos de Pan de Jamón para confirmar tu pedido programado para el ${date || 'próximamente'}. Total: ${formattedTotal}, Abonado: ${formattedPaid}. ¡Gracias por tu compra! ✨`;
+      window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    window.openOrderModal = function() {
+      document.getElementById('order-id').value = "";
+      document.getElementById('order-form').reset();
+      document.getElementById('caja-selection-box').style.display = 'none';
+      document.getElementById('modal-title').innerText = "Nuevo Pedido";
+      document.getElementById('order-modal').classList.add('active');
+    };
+
+    window.closeOrderModal = function() {
+      document.getElementById('order-modal').classList.remove('active');
+    };
+
+    window.saveOrder = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('order-id').value;
+      const qtyCajas = parseInt(document.getElementById('f-cajas').value) || 0;
+
+      const orderData = {
+        clientName: document.getElementById('f-client').value,
+        phone: document.getElementById('f-phone').value,
+        deliveryDate: document.getElementById('f-date').value,
+        currency: document.getElementById('f-currency').value,
+        totalPrice: parseFloat(document.getElementById('f-total').value) || 0,
+        paidAmount: parseFloat(document.getElementById('f-paid').value) || 0,
+        qtyTradicional: parseInt(document.getElementById('f-trad').value) || 0,
+        qtyEspecial: parseInt(document.getElementById('f-esp').value) || 0,
+        qtyMedio: parseInt(document.getElementById('f-medio').value) || 0,
+        qtyCajas: qtyCajas,
+        cajaContent: qtyCajas > 0 ? {
+          miniPan: parseInt(document.getElementById('fc-miniPan').value) || 0,
+          ponche: parseInt(document.getElementById('fc-ponche').value) || 0,
+          torta: parseInt(document.getElementById('fc-torta').value) || 0,
+          galletas: parseInt(document.getElementById('fc-galletas').value) || 0
+        } : null,
+        notes: document.getElementById('f-notes').value,
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        if (id) {
+          await updateDoc(doc(db, "pedidos", id), orderData);
+        } else {
+          await addDoc(collection(db, "pedidos"), orderData);
+        }
+        closeOrderModal();
+      } catch (err) {
+        alert("Error al guardar: " + err.message);
+      }
+    };
+
+    window.editOrder = function(id) {
+      const o = (window.allOrdersCache || []).find(x => x.id === id);
+      if (!o) return;
+
+      document.getElementById('order-id').value = o.id;
+      document.getElementById('f-client').value = o.clientName || '';
+      document.getElementById('f-phone').value = o.phone || '';
+      document.getElementById('f-date').value = o.deliveryDate || '';
+      document.getElementById('f-currency').value = o.currency || 'USD';
+      document.getElementById('f-total').value = o.totalPrice || 0;
+      document.getElementById('f-paid').value = o.paidAmount || 0;
+      document.getElementById('f-trad').value = o.qtyTradicional || 0;
+      document.getElementById('f-esp').value = o.qtyEspecial || 0;
+      document.getElementById('f-medio').value = o.qtyMedio || 0;
+      document.getElementById('f-cajas').value = o.qtyCajas || 0;
+
+      if (o.qtyCajas > 0 && o.cajaContent) {
+        document.getElementById('fc-miniPan').value = o.cajaContent.miniPan || 0;
+        document.getElementById('fc-ponche').value = o.cajaContent.ponche || 0;
+        document.getElementById('fc-torta').value = o.cajaContent.torta || 0;
+        document.getElementById('fc-galletas').value = o.cajaContent.galletas || 0;
+        document.getElementById('caja-selection-box').style.display = 'block';
+      } else {
+        document.getElementById('caja-selection-box').style.display = 'none';
+      }
+
+      document.getElementById('f-notes').value = o.notes || '';
+      document.getElementById('modal-title').innerText = "Editar Pedido";
+      document.getElementById('order-modal').classList.add('active');
+    };
+
+    window.deleteOrder = async function(id) {
+      if (confirm("¿Estás segura de eliminar este pedido?")) {
+        try {
+          await deleteDoc(doc(db, "pedidos", id));
+        } catch (err) {
+          alert("Error al eliminar: " + err.message);
+        }
+      }
+    };
+  </script>
+</head>
+<body>
+
+  <div id="config-screen" class="container">
+    <div class="auth-box">
+      <h2>⚙️ Configuración Firebase</h2>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:1rem;">Ingresa las claves obtenidas de tu proyecto en Firebase.</p>
+      <div class="form-group"><label>apiKey</label><input type="text" id="cfg-apiKey" class="form-control"></div>
+      <div class="form-group"><label>authDomain</label><input type="text" id="cfg-authDomain" class="form-control"></div>
+      <div class="form-group"><label>projectId</label><input type="text" id="cfg-projectId" class="form-control"></div>
+      <div class="form-group"><label>storageBucket</label><input type="text" id="cfg-storageBucket" class="form-control"></div>
+      <div class="form-group"><label>messagingSenderId</label><input type="text" id="cfg-messagingSenderId" class="form-control"></div>
+      <div class="form-group"><label>appId</label><input type="text" id="cfg-appId" class="form-control"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="saveConfig()">Guardar y Conectar</button>
+    </div>
+  </div>
+
+  <div id="auth-screen" class="container">
+    <div class="auth-box">
+      <h2>🥖 Iniciar Sesión</h2>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:1rem;">Control de Pedidos de Pan de Jamón</p>
+      <div class="form-group"><label>Correo Electrónico</label><input type="email" id="login-email" class="form-control"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="login-pass" class="form-control"></div>
+      <div id="login-error" style="color:var(--danger); font-size:0.8rem; margin-bottom:0.5rem;"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="login()">Entrar</button>
+    </div>
+  </div>
+
+  <div id="app-screen" style="display:none;">
+    <header>
+      <div class="header-title">
+        <h1>Pan de Jamón 🎄</h1>
+        <p><span id="user-email"></span> | <a href="#" onclick="resetConfig()" style="color:#fde047; text-decoration:none;">Reconfigurar</a></p>
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="openOrderModal()">+ Nuevo</button>
+        <button class="btn btn-secondary btn-sm" onclick="logout()">Salir</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="nav-tabs">
+        <button id="tab-pedidos" class="tab-btn active" onclick="switchTab('pedidos')">📋 Pedidos</button>
+        <button id="tab-inventario" class="tab-btn" onclick="switchTab('inventario')">📦 Inventario</button>
+      </div>
+
+      <!-- SECCION PEDIDOS -->
+      <div id="sec-pedidos">
+        <div class="stats-grid">
+          <div class="card stat-card usd">
+            <div class="stat-title">💵 DÓLARES ($ USD)</div>
+            <div class="stat-values">
+              <div>Cobrado: <div class="stat-val collected" id="usd-collected">$0.00</div></div>
+              <div>Por Cobrar: <div class="stat-val pending" id="usd-pending">$0.00</div></div>
+            </div>
+          </div>
+          <div class="card stat-card ves">
+            <div class="stat-title">🇻🇪 BOLÍVARES (BS. VES)</div>
+            <div class="stat-values">
+              <div>Cobrado: <div class="stat-val collected" id="ves-collected">Bs. 0,00</div></div>
+              <div>Por Cobrar: <div class="stat-val pending" id="ves-pending">Bs. 0,00</div></div>
+            </div>
+          </div>
+          <div class="card stat-card cop">
+            <div class="stat-title">🇨🇴 PESOS ($ COP)</div>
+            <div class="stat-values">
+              <div>Cobrado: <div class="stat-val collected" id="cop-collected">$0 COP</div></div>
+              <div>Por Cobrar: <div class="stat-val pending" id="cop-pending">$0 COP</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stat-title" style="margin-bottom:0.5rem;">📊 TOTAL PRODUCTOS REQUERIDOS</div>
+          <div class="products-summary">
+            <div class="prod-badge"><div class="num" id="cnt-tradicional">0</div><div class="label">🥖 Tradicional</div></div>
+            <div class="prod-badge"><div class="num" id="cnt-especial">0</div><div class="label">⭐ Especiales</div></div>
+            <div class="prod-badge"><div class="num" id="cnt-medio">0</div><div class="label">🥖 Medio Pan</div></div>
+            <div class="prod-badge"><div class="num" id="cnt-cajas">0</div><div class="label">🎁 Cajas Navideñas</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stat-title" style="margin-bottom:0.5rem;">📋 LISTADO DE PEDIDOS</div>
+          <div id="orders-list"></div>
+        </div>
+      </div>
+
+      <!-- SECCION INVENTARIO -->
+      <div id="sec-inventario" style="display:none;">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div class="stat-title">📦 INVENTARIO Y MATERIALES</div>
+            <button class="btn btn-primary btn-sm" onclick="addInventoryItem()">+ Agregar Producto</button>
+          </div>
+          <div id="inventory-list" class="inventory-grid"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL PEDIDO -->
+  <div id="order-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Nuevo Pedido</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeOrderModal()">X</button>
+      </div>
+      <form id="order-form" onsubmit="saveOrder(event)">
+        <input type="hidden" id="order-id">
+        <div class="form-group">
+          <label>Cliente</label>
+          <input type="text" id="f-client" class="form-control" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" id="f-phone" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Fecha Entrega</label>
+            <input type="date" id="f-date" class="form-control">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Moneda</label>
+            <select id="f-currency" class="form-control">
+              <option value="USD">USD ($)</option>
+              <option value="VES">VES (Bs.)</option>
+              <option value="COP">COP ($)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Total Precio</label>
+            <input type="number" step="0.01" id="f-total" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Monto Abonado</label>
+          <input type="number" step="0.01" id="f-paid" class="form-control" value="0">
+        </div>
+        
+        <div style="font-weight:600; font-size:0.85rem; margin:0.5rem 0;">Cantidades de Productos:</div>
+        <div class="form-row">
+          <div class="form-group"><label>🥖 Tradicional</label><input type="number" id="f-trad" class="form-control" value="0"></div>
+          <div class="form-group"><label>⭐ Especial</label><input type="number" id="f-esp" class="form-control" value="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>🥖 ½ Pan</label><input type="number" id="f-medio" class="form-control" value="0"></div>
+          <div class="form-group"><label>🎁 Cajas Navideñas</label><input type="number" id="f-cajas" class="form-control" value="0" onchange="toggleCajaSelection()" onkeyup="toggleCajaSelection()"></div>
+        </div>
+
+        <!-- SELECCION PRODUCTOS CAJA NAVIDEÑA -->
+        <div id="caja-selection-box" class="caja-items-box" style="display:none;">
+          <div style="font-weight:700; font-size:0.8rem; color:#854d0e; margin-bottom:0.4rem;">🎁 Selección de Contenido de la Caja Navideña:</div>
+          <div class="form-row">
+            <div class="form-group"><label>🥖 Mini Pan de Jamón</label><input type="number" id="fc-miniPan" class="form-control" value="0"></div>
+            <div class="form-group"><label>🍾 Ponche Crema</label><input type="number" id="fc-ponche" class="form-control" value="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>🎂 Mini Torta Negra</label><input type="number" id="fc-torta" class="form-control" value="0"></div>
+            <div class="form-group"><label>🍪 Galletas</label><input type="number" id="fc-galletas" class="form-control" value="0"></div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:0.5rem;">
+          <label>📝 Observaciones / Notas (Ej: sin aceitunas, extra pasas)</label>
+          <textarea id="f-notes" class="form-control" rows="2" placeholder="Detalles especiales del pedido..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1rem;">Guardar Pedido</button>
+      </form>
+    </div>
+  </div>
+
+</body>
+</html>
