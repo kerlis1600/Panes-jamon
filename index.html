@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pan de Jamón - Control de Pedidos e Inventario</title>
+  <style>
+    :root {
+      --primary: #2d6a4f;
+      --primary-dark: #1b4332;
+      --secondary: #d97706;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --danger: #ef4444;
+      --success: #10b981;
+      --whatsapp: #25d366;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 80px; }
+
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: sticky; top: 0; z-index: 100;
+    }
+
+    .header-title h1 { font-size: 1.2rem; font-weight: 700; }
+    .header-title p { font-size: 0.75rem; opacity: 0.9; }
+
+    .btn {
+      padding: 0.5rem 0.8rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; font-size: 0.85rem;
+    }
+    .btn-primary { background: var(--secondary); color: white; }
+    .btn-secondary { background: #e2e8f0; color: var(--text); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-whatsapp { background: var(--whatsapp); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+
+    .nav-tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.2rem; }
+    .tab-btn { flex: 1; min-width: 90px; padding: 0.6rem 0.4rem; border: none; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #64748b; cursor: pointer; font-size: 0.8rem; text-align: center; }
+    .tab-btn.active { background: var(--primary); color: white; }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 1rem; }
+
+    .card {
+      background: var(--card-bg); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+      border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+    .stat-card { border-left: 4px solid var(--primary); }
+    .stat-card.usd { border-left-color: #10b981; }
+    .stat-card.ves { border-left-color: #3b82f6; }
+    .stat-card.cop { border-left-color: #f59e0b; }
+    .stat-title { font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .stat-values { display: flex; justify-content: space-between; margin-top: 0.4rem; }
+    .stat-val { font-size: 1rem; font-weight: 700; }
+    .stat-val.collected { color: var(--success); }
+    .stat-val.pending { color: var(--danger); }
+
+    .products-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .prod-badge { background: #f1f5f9; padding: 0.5rem; border-radius: 8px; text-align: center; }
+    .prod-badge .num { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+    .prod-badge .label { font-size: 0.75rem; color: #64748b; }
+
+    .order-item { border-bottom: 1px solid var(--border); padding: 0.8rem 0; }
+    .order-item:last-child { border-bottom: none; }
+    .order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem; }
+    .client-name { font-weight: 700; font-size: 0.95rem; }
+    .order-status { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 12px; font-weight: 600; }
+    .status-pagado { background: #dcfce7; color: #15803d; }
+    .status-pendiente { background: #fee2e2; color: #b91c1c; }
+    .status-abono { background: #fef3c7; color: #b45309; }
+    .status-entregado { background: #e0f2fe; color: #0369a1; }
+
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.2rem; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+
+    .form-group { margin-bottom: 0.8rem; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .form-control { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+    .sub-selection-box { background: #f8fafc; border: 1px solid var(--border); padding: 0.8rem; border-radius: 8px; margin-top: 0.5rem; }
+    
+    .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.8rem; }
+    .inv-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; text-align: center; }
+
+    .recipe-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+
+    #auth-screen, #config-screen { display: none; }
+    .auth-box { max-width: 400px; margin: 2rem auto; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  </style>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    let auth, db, unsubscribeOrders, unsubscribeInventory, unsubscribeRecipes;
+
+    function formatMoney(amount, currency) {
+      const val = parseFloat(amount) || 0;
+      if (currency === 'USD') {
+        return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else if (currency === 'VES') {
+        return `Bs. ${val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else if (currency === 'COP') {
+        return `$${val.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`;
+      }
+      return `${val} ${currency}`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedConfig = localStorage.getItem('panes_firebase_config');
+      if (!savedConfig) {
+        document.getElementById('config-screen').style.display = 'block';
+      } else {
+        initFirebase(JSON.parse(savedConfig));
+      }
+    });
+
+    window.saveConfig = function() {
+      const config = {
+        apiKey: document.getElementById('cfg-apiKey').value.trim(),
+        authDomain: document.getElementById('cfg-authDomain').value.trim(),
+        projectId: document.getElementById('cfg-projectId').value.trim(),
+        storageBucket: document.getElementById('cfg-storageBucket').value.trim(),
+        messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
+        appId: document.getElementById('cfg-appId').value.trim()
+      };
+
+      if (!config.apiKey || !config.projectId) {
+        alert("Por favor completa las claves requeridas.");
+        return;
+      }
+
+      localStorage.setItem('panes_firebase_config', JSON.stringify(config));
+      location.reload();
+    };
+
+    window.resetConfig = function() {
+      if (confirm("¿Deseas cambiar las claves de Firebase?")) {
+        localStorage.removeItem('panes_firebase_config');
+        location.reload();
+      }
+    };
+
+    function initFirebase(config) {
+      try {
+        const app = initializeApp(config);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            document.getElementById('user-email').innerText = user.email;
+            loadOrders();
+            loadInventory();
+            loadRecipes();
+          } else {
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('auth-screen').style.display = 'block';
+          }
+        });
+      } catch (err) {
+        alert("Error de conexión a Firebase: " + err.message);
+        document.getElementById('config-screen').style.display = 'block';
+      }
+    }
+
+    window.login = async function() {
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-pass').value;
+      const errEl = document.getElementById('login-error');
+      errEl.innerText = "";
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (err) {
+        errEl.innerText = "Error: Credenciales incorrectas o problema de acceso.";
+      }
+    };
+
+    window.logout = function() {
+      signOut(auth);
+    };
+
+    window.switchTab = function(tab) {
+      ['pedidos', 'entregados', 'inventario', 'recetas'].forEach(t => {
+        document.getElementById(`sec-${t}`).style.display = (t === tab) ? 'block' : 'none';
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      });
+    };
+
+    function loadOrders() {
+      const q = query(collection(db, "pedidos"), orderBy("createdAt", "desc"));
+      unsubscribeOrders = onSnapshot(q, (snapshot) => {
+        const orders = [];
+        snapshot.forEach((doc) => {
+          orders.push({ id: doc.id, ...doc.data() });
+        });
+        renderOrders(orders);
+      });
+    }
+
+    function renderOrders(orders) {
+      const activeListEl = document.getElementById('orders-list');
+      const deliveredListEl = document.getElementById('delivered-list');
+      activeListEl.innerHTML = "";
+      deliveredListEl.innerHTML = "";
+
+      let totals = {
+        USD: { cobrado: 0, porCobrar: 0 },
+        VES: { cobrado: 0, porCobrar: 0 },
+        COP: { cobrado: 0, porCobrar: 0 }
+      };
+
+      let prodsPending = { tradicional: 0, especial: 0, medio: 0, cajas: 0 };
+      let activeCount = 0;
+      let deliveredCount = 0;
+
+      orders.forEach(o => {
+        const curr = o.currency || 'USD';
+        const total = parseFloat(o.totalPrice) || 0;
+        const paid = parseFloat(o.paidAmount) || 0;
+        const pending = Math.max(0, total - paid);
+
+        if (totals[curr]) {
+          totals[curr].cobrado += paid;
+          totals[curr].porCobrar += pending;
+        }
+
+        if (!o.isDelivered) {
+          prodsPending.tradicional += parseInt(o.qtyTradicional) || 0;
+          prodsPending.especial += parseInt(o.qtyEspecial) || 0;
+          prodsPending.medio += parseInt(o.qtyMedio) || 0;
+          prodsPending.cajas += parseInt(o.qtyCajas) || 0;
+        }
+
+        let statusClass = 'status-pendiente';
+        let statusText = o.paymentStatus || 'Pendiente';
+        if (statusText === 'Pagado') statusClass = 'status-pagado';
+        else if (statusText === 'Abonado') statusClass = 'status-abono';
+
+        if (o.isDelivered) {
+          statusClass = 'status-entregado';
+          statusText = 'Entregado';
+        }
+
+        let prodSummaryText = [];
+        if (o.qtyTradicional > 0) prodSummaryText.push(`🥖 Trad: ${o.qtyTradicional}`);
+        
+        if (o.qtyEspecial > 0) {
+          let espTypeStr = o.especialType ? ` (${o.especialType})` : '';
+          prodSummaryText.push(`⭐ Esp: ${o.qtyEspecial}${espTypeStr}`);
+        }
+
+        if (o.qtyMedio > 0) prodSummaryText.push(`🥖 ½ Pan: ${o.qtyMedio}`);
+        if (o.qtyCajas > 0) prodSummaryText.push(`🎁 Cajas: ${o.qtyCajas}`);
+
+        let cajaDetailStr = "";
+        if (o.qtyCajas > 0 && o.cajaContent) {
+          let parts = [];
+          if (o.cajaContent.miniPan > 0) parts.push(`${o.cajaContent.miniPan} Mini Pan`);
+          if (o.cajaContent.ponche > 0) parts.push(`${o.cajaContent.ponche} Ponche`);
+          if (o.cajaContent.torta > 0) parts.push(`${o.cajaContent.torta} Torta Negra`);
+          if (o.cajaContent.galletas > 0) parts.push(`${o.cajaContent.galletas} Galletas`);
+          if (parts.length > 0) cajaDetailStr = `🎁 <i>Contenido Caja: ${parts.join(', ')}</i>`;
+        }
+
+        const formattedTotal = formatMoney(total, curr);
+        const formattedPaid = formatMoney(paid, curr);
+
+        const itemHtml = `
+          <div class="order-item">
+            <div class="order-header">
+              <div>
+                <span class="client-name">${o.clientName}</span>
+                <div style="font-size:0.75rem; color:#64748b;">📞 ${o.phone || 'Sin telf'} | 📅 ${o.deliveryDate || 'Sin fecha'}</div>
+              </div>
+              <span class="order-status ${statusClass}">${statusText}</span>
+            </div>
+            <div style="font-size:0.8rem; margin:0.2rem 0; font-weight:600; color:#2d6a4f;">
+              ${prodSummaryText.join(' | ')}
+            </div>
+            ${cajaDetailStr ? `<div style="font-size:0.75rem; color:#854d0e; background:#fef9c3; padding:0.2rem 0.4rem; border-radius:4px; margin:0.2rem 0;">${cajaDetailStr}</div>` : ''}
+            ${o.notes ? `<div style="font-size:0.75rem; color:#d97706; background:#fffbeb; padding:0.2rem 0.4rem; border-radius:4px; margin:0.2rem 0;">📝 <b>Obs:</b> ${o.notes}</div>` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-top:0.4rem; flex-wrap:wrap; gap:0.4rem;">
+              <div>Total: <b>${formattedTotal}</b> | Abonado: <span style="color:#10b981;">${formattedPaid}</span></div>
+              <div style="display:flex; gap:0.3rem;">
+                ${!o.isDelivered ? `<button class="btn btn-success btn-sm" onclick="markAsDelivered('${o.id}')">✅ Entregar</button>` : ''}
+                ${o.phone ? `<button class="btn btn-whatsapp btn-sm" onclick="sendWhatsApp('${o.phone}', '${o.clientName}', '${formattedTotal}', '${formattedPaid}', '${o.deliveryDate}')">💬</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="editOrder('${o.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (o.isDelivered) {
+          deliveredListEl.innerHTML += itemHtml;
+          deliveredCount++;
+        } else {
+          activeListEl.innerHTML += itemHtml;
+          activeCount++;
+        }
+      });
+
+      if (activeCount === 0) activeListEl.innerHTML = `<p style="text-align:center; color:#64748b; font-size:0.85rem; padding:1rem;">No hay pedidos pendientes por entregar.</p>`;
+      if (deliveredCount === 0) deliveredListEl.innerHTML = `<p style="text-align:center; color:#64748b; font-size:0.85rem; padding:1rem;">No hay pedidos entregados aún.</p>`;
+
+      document.getElementById('usd-collected').innerText = formatMoney(totals.USD.cobrado, 'USD');
+      document.getElementById('usd-pending').innerText = formatMoney(totals.USD.porCobrar, 'USD');
+      document.getElementById('ves-collected').innerText = formatMoney(totals.VES.cobrado, 'VES');
+      document.getElementById('ves-pending').innerText = formatMoney(totals.VES.porCobrar, 'VES');
+      document.getElementById('cop-collected').innerText = formatMoney(totals.COP.cobrado, 'COP');
+      document.getElementById('cop-pending').innerText = formatMoney(totals.COP.porCobrar, 'COP');
+
+      document.getElementById('cnt-tradicional').innerText = prodsPending.tradicional;
+      document.getElementById('cnt-especial').innerText = prodsPending.especial;
+      document.getElementById('cnt-medio').innerText = prodsPending.medio;
+      document.getElementById('cnt-cajas').innerText = prodsPending.cajas;
+
+      window.allOrdersCache = orders;
+    }
+
+    window.markAsDelivered = async function(id) {
+      if (confirm("¿Confirmar que este pedido ya fue entregado?")) {
+        await updateDoc(doc(db, "pedidos", id), { isDelivered: true });
+      }
+    };
+
+    function loadInventory() {
+      const q = collection(db, "inventario");
+      unsubscribeInventory = onSnapshot(q, (snapshot) => {
+        let items = [];
+        snapshot.forEach((doc) => { items.push({ id: doc.id, ...doc.data() }); });
+        if (items.length === 0) { initDefaultInventory(); return; }
+        renderInventory(items);
+        window.inventoryCache = items;
+      });
+    }
+
+    async function initDefaultInventory() {
+      const defaults = [
+        { name: 'Pasas', qty: 5, unit: 'kg' },
+        { name: 'Aceitunas', qty: 5, unit: 'kg' },
+        { name: 'Jamón', qty: 50, unit: 'kg' },
+        { name: 'Tocineta', qty: 20, unit: 'kg' },
+        { name: 'Cajas', qty: 100, unit: 'unid' },
+        { name: 'Mini Pan', qty: 50, unit: 'unid' },
+        { name: 'Ponche Crema', qty: 30, unit: 'unid' },
+        { name: 'Torta Negra', qty: 30, unit: 'unid' },
+        { name: 'Galletas', qty: 100, unit: 'unid' }
+      ];
+      for (let item of defaults) { await addDoc(collection(db, "inventario"), item); }
+    }
+
+    function renderInventory(items) {
+      const grid = document.getElementById('inventory-list');
+      grid.innerHTML = "";
+      items.forEach(item => {
+        grid.innerHTML += `
+          <div class="inv-card">
+            <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.3rem;">${item.name}</div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:0.3rem; margin:0.4rem 0;">
+              <input type="number" step="0.01" value="${item.qty}" class="form-control" style="width:90px; text-align:center; font-weight:700; font-size:1.1rem; color:var(--primary);" onchange="updateStockDirect('${item.id}', this.value)">
+              <span style="font-size:0.85rem; font-weight:600; color:#64748b;">${item.unit || ''}</span>
+            </div>
+            <div style="display:flex; justify-content:center; gap:0.3rem; margin-top:0.4rem;">
+              <button class="btn btn-danger btn-sm" onclick="deleteInvItem('${item.id}')">🗑️ Eliminar</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    window.updateStockDirect = async function(id, value) {
+      let newQty = parseFloat(value) || 0;
+      if (newQty < 0) newQty = 0;
+      await updateDoc(doc(db, "inventario", id), { qty: newQty });
+    };
+
+    window.deleteInvItem = async function(id) {
+      if (confirm("¿Eliminar este producto?")) await deleteDoc(doc(db, "inventario", id));
+    };
+
+    window.addInventoryItem = async function() {
+      const name = prompt("Nombre del producto/ingrediente:");
+      if (!name) return;
+      const qtyStr = prompt("Cantidad inicial:", "0");
+      const unit = prompt("Unidad de medida (ej: kg, unid, lt):", "kg");
+      await addDoc(collection(db, "inventario"), { name: name.trim(), qty: parseFloat(qtyStr) || 0, unit: unit.trim() });
+    };
+
+    function loadRecipes() {
+      const q = collection(db, "recetas");
+      unsubscribeRecipes = onSnapshot(q, (snapshot) => {
+        let recipes = {};
+        snapshot.forEach((doc) => { recipes[doc.id] = doc.data(); });
+        if (Object.keys(recipes).length === 0) { initDefaultRecipes(); return; }
+        renderRecipes(recipes);
+        window.recipesCache = recipes;
+      });
+    }
+
+    async function initDefaultRecipes() {
+      const defs = {
+        tradicional: {
+          jamon: { amount: 500, unit: 'g' },
+          tocineta: { amount: 200, unit: 'g' },
+          pasas: { amount: 50, unit: 'g' },
+          aceitunas: { amount: 50, unit: 'g' }
+        },
+        especial: {
+          jamon: { amount: 600, unit: 'g' },
+          tocineta: { amount: 250, unit: 'g' },
+          pasas: { amount: 80, unit: 'g' },
+          aceitunas: { amount: 80, unit: 'g' }
+        },
+        medio: {
+          jamon: { amount: 250, unit: 'g' },
+          tocineta: { amount: 100, unit: 'g' },
+          pasas: { amount: 25, unit: 'g' },
+          aceitunas: { amount: 25, unit: 'g' }
+        },
+        caja: {
+          cajas: { amount: 1, unit: 'unid' },
+          miniPan: { amount: 1, unit: 'unid' },
+          ponche: { amount: 1, unit: 'unid' },
+          torta: { amount: 1, unit: 'unid' },
+          galletas: { amount: 1, unit: 'unid' }
+        }
+      };
+      for (let key in defs) {
+        await setDoc(doc(db, "recetas", key), defs[key]);
+      }
+    }
+
+    function renderRecipes(recipes) {
+      const box = document.getElementById('recipes-container');
+      box.innerHTML = "";
+      
+      const titles = { tradicional: '🥖 Pan Tradicional', especial: '⭐ Pan Especial', medio: '🥖 Medio Pan', caja: '🎁 Caja Navideña' };
+      
+      for (let key in recipes) {
+        let itemsHtml = "";
+        let data = recipes[key];
+        const isCaja = (key === 'caja');
+
+        for (let ing in data) {
+          let val = typeof data[ing] === 'object' ? data[ing].amount : data[ing];
+          let unit = typeof data[ing] === 'object' ? data[ing].unit : (isCaja ? 'unid' : 'g');
+
+          itemsHtml += `
+            <div class="recipe-row">
+              <span style="font-weight:600;">${ing}:</span>
+              <div style="display:flex; align-items:center; gap:0.3rem;">
+                <input type="number" step="0.01" value="${val}" id="rc-val-${key}-${ing}" class="form-control" style="width:80px; padding:0.2rem; text-align:center;">
+                ${isCaja ? `<span style="font-size:0.8rem; font-weight:600; color:#64748b;">unid</span><input type="hidden" id="rc-unit-${key}-${ing}" value="unid">` : `
+                  <select id="rc-unit-${key}-${ing}" class="form-control" style="width:75px; padding:0.2rem; font-size:0.8rem;">
+                    <option value="g" ${unit === 'g' ? 'selected' : ''}>g</option>
+                    <option value="kg" ${unit === 'kg' ? 'selected' : ''}>kg</option>
+                    <option value="unid" ${unit === 'unid' ? 'selected' : ''}>unid</option>
+                  </select>
+                `}
+              </div>
+            </div>
+          `;
+        }
+        box.innerHTML += `
+          <div class="card" style="margin-bottom:0.8rem;">
+            <div style="font-weight:700; margin-bottom:0.4rem; color:var(--primary);">${titles[key] || key}</div>
+            ${itemsHtml}
+            <button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="saveRecipeData('${key}')">Guardar Receta</button>
+          </div>
+        `;
+      }
+    }
+
+    window.saveRecipeData = async function(key) {
+      const container = window.recipesCache[key];
+      let updatedData = {};
+      for (let ing in container) {
+        const valEl = document.getElementById(`rc-val-${key}-${ing}`);
+        const unitEl = document.getElementById(`rc-unit-${key}-${ing}`);
+        updatedData[ing] = {
+          amount: parseFloat(valEl.value) || 0,
+          unit: unitEl.value || 'g'
+        };
+      }
+      await setDoc(doc(db, "recetas", key), updatedData);
+      alert("¡Receta actualizada con éxito!");
+    };
+
+    async function applyInventoryDeduction(newOrder, oldOrder = null) {
+      if (!window.inventoryCache || !window.recipesCache) return;
+
+      let diffTrad = (newOrder.qtyTradicional || 0) - (oldOrder ? (oldOrder.qtyTradicional || 0) : 0);
+      let diffEsp = (newOrder.qtyEspecial || 0) - (oldOrder ? (oldOrder.qtyEspecial || 0) : 0);
+      let diffMedio = (newOrder.qtyMedio || 0) - (oldOrder ? (oldOrder.qtyMedio || 0) : 0);
+      let diffCajas = (newOrder.qtyCajas || 0) - (oldOrder ? (oldOrder.qtyCajas || 0) : 0);
+
+      let consumptionInKg = {};
+
+      function addCons(recipeKey, multiplier) {
+        const rec = window.recipesCache[recipeKey];
+        if (!rec) return;
+        for (let ing in rec) {
+          let item = rec[ing];
+          let amt = typeof item === 'object' ? item.amount : item;
+          let unit = typeof item === 'object' ? item.unit : 'g';
+
+          let finalAmountInKg = (unit === 'g') ? (amt / 1000) : amt;
+          consumptionInKg[ing] = (consumptionInKg[ing] || 0) + (finalAmountInKg * multiplier);
+        }
+      }
+
+      if (diffTrad !== 0) addCons('tradicional', diffTrad);
+      if (diffEsp !== 0) addCons('especial', diffEsp);
+      if (diffMedio !== 0) addCons('medio', diffMedio);
+      if (diffCajas !== 0) {
+        addCons('caja', diffCajas);
+        if (newOrder.cajaContent) {
+          consumptionInKg['mini Pan'] = (consumptionInKg['mini Pan'] || 0) + ((newOrder.cajaContent.miniPan - (oldOrder?.cajaContent?.miniPan || 0)) * diffCajas);
+          consumptionInKg['ponche Crema'] = (consumptionInKg['ponche Crema'] || 0) + ((newOrder.cajaContent.ponche - (oldOrder?.cajaContent?.ponche || 0)) * diffCajas);
+          consumptionInKg['torta Negra'] = (consumptionInKg['torta Negra'] || 0) + ((newOrder.cajaContent.torta - (oldOrder?.cajaContent?.torta || 0)) * diffCajas);
+          consumptionInKg['galletas'] = (consumptionInKg['galletas'] || 0) + ((newOrder.cajaContent.galletas - (oldOrder?.cajaContent?.galletas || 0)) * diffCajas);
+        }
+      }
+
+      for (let ingName in consumptionInKg) {
+        let amount = consumptionInKg[ingName];
+        let invItem = window.inventoryCache.find(x => x.name.toLowerCase() === ingName.toLowerCase());
+        if (invItem) {
+          let newQty = invItem.qty - amount;
+          if (newQty < 0) newQty = 0;
+          await updateDoc(doc(db, "inventario", invItem.id), { qty: parseFloat(newQty.toFixed(3)) });
+        }
+      }
+    }
+
+    window.toggleEspecialSelection = function() {
+      const qtyEsp = parseInt(document.getElementById('f-esp').value) || 0;
+      document.getElementById('especial-selection-box').style.display = (qtyEsp > 0) ? 'block' : 'none';
+    };
+
+    window.toggleCajaSelection = function() {
+      const qtyCajas = parseInt(document.getElementById('f-cajas').value) || 0;
+      document.getElementById('caja-selection-box').style.display = (qtyCajas > 0) ? 'block' : 'none';
+    };
+
+    window.sendWhatsApp = function(phone, name, formattedTotal, formattedPaid, date) {
+      const msg = `¡Hola ${name}! 🎄 Te escribimos de Pan de Jamón para confirmar tu pedido programado para el ${date || 'próximamente'}. Total: ${formattedTotal}, Abonado: ${formattedPaid}. ¡Gracias por tu compra! ✨`;
+      window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    window.openOrderModal = function() {
+      document.getElementById('order-id').value = "";
+      document.getElementById('order-form').reset();
+      document.getElementById('f-delivered').checked = false;
+      document.getElementById('especial-selection-box').style.display = 'none';
+      document.getElementById('caja-selection-box').style.display = 'none';
+      document.getElementById('modal-title').innerText = "Nuevo Pedido";
+      document.getElementById('order-modal').classList.add('active');
+    };
+
+    window.closeOrderModal = function() {
+      document.getElementById('order-modal').classList.remove('active');
+    };
+
+    window.saveOrder = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('order-id').value;
+      const qtyEspecial = parseInt(document.getElementById('f-esp').value) || 0;
+      const qtyCajas = parseInt(document.getElementById('f-cajas').value) || 0;
+
+      const orderData = {
+        clientName: document.getElementById('f-client').value,
+        phone: document.getElementById('f-phone').value,
+        deliveryDate: document.getElementById('f-date').value,
+        currency: document.getElementById('f-currency').value,
+        totalPrice: parseFloat(document.getElementById('f-total').value) || 0,
+        paidAmount: parseFloat(document.getElementById('f-paid').value) || 0,
+        paymentStatus: document.getElementById('f-pay-status').value,
+        isDelivered: document.getElementById('f-delivered').checked,
+        qtyTradicional: parseInt(document
